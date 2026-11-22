@@ -3,6 +3,9 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
 
 jobs:
   test:
@@ -18,6 +21,20 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
       - uses: ramsey/composer-install@v3
+      - run: composer test
+      - run: composer analyse
+      - run: composer format:check
+
+  latest-dependencies:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - run: composer update --no-interaction --prefer-dist
       - run: composer test
       - run: composer analyse
       - run: composer format:check

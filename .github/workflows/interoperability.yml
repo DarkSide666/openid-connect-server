@@ -10,13 +10,22 @@ jobs:
   reference-provider:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          path: openid-connect-server
+      - name: Select examples branch
+        id: examples-ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.EXAMPLES_REPOSITORY_TOKEN || github.token }}
+          CANDIDATE_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          if [[ ("$CANDIDATE_BRANCH" == "main" || "$CANDIDATE_BRANCH" == "develop") ]] && git ls-remote --exit-code --heads "https://x-access-token:${GH_TOKEN}@github.com/darkside666/openid-connect-server-examples.git" "refs/heads/$CANDIDATE_BRANCH" >/dev/null 2>&1; then
+            echo "ref=$CANDIDATE_BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           repository: darkside666/openid-connect-server-examples
-          ref: develop
+          ref: ${{ steps.examples-ref.outputs.ref }}
           path: openid-connect-server-examples
           token: ${{ secrets.EXAMPLES_REPOSITORY_TOKEN || github.token }}
       - uses: shivammathur/setup-php@v2
@@ -24,36 +33,38 @@ jobs:
           php-version: '8.2'
           extensions: curl, json, openssl
           coverage: none
-      - name: Install reference-provider dependencies against this checkout
+      - name: Install reference-provider dependencies
         working-directory: openid-connect-server-examples/reference-provider
-        run: composer update --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist
+      - name: Update reference provider to the matching library branch
+        working-directory: openid-connect-server-examples/reference-provider
+        run: composer update darkside/openid-connect-server --with darkside/openid-connect-server:dev-${{ steps.examples-ref.outputs.ref }} --no-interaction --prefer-dist
       - name: Install interoperability-client dependencies
         working-directory: openid-connect-server-examples/interop-client
-        run: composer update --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist
       - name: Configure test-only provider and RP
         shell: bash
         run: |
           cat > openid-connect-server-examples/reference-provider/.env <<'EOF'
-          OIDC_REFERENCE_BASE_URL=http://127.0.0.1:8080
+          OIDC_REFERENCE_BASE_URL=https://127.0.0.1:8443
           OIDC_REFERENCE_CLIENT_ID=oidc-test-client
           OIDC_REFERENCE_CLIENT_SECRET=ci-only-client-secret
-          OIDC_REFERENCE_REDIRECT_URI=http://127.0.0.1:8081/callback
+          OIDC_REFERENCE_REDIRECT_URI=https://127.0.0.1:8081/callback
           OIDC_REFERENCE_TEST_USERNAME=alice
           OIDC_REFERENCE_TEST_PASSWORD=ci-only-password
           OIDC_REFERENCE_TEST_CONTROL_SECRET=ci-only-control-secret
           OIDC_REFERENCE_ACCESS_TOKEN_TTL_SECONDS=2
-          OIDC_REFERENCE_ALLOW_INSECURE_HTTP_FOR_CI=1
           OIDC_REFERENCE_DATA_DIR=var
           EOF
-          cat > openid-connect-server-examples/interop-client/.env <<'EOF'
-          OIDC_INTEROP_PROVIDER_ISSUER=http://127.0.0.1:8080
+          cat > openid-connect-server-examples/interop-client/.env <<EOF
+          OIDC_INTEROP_PROVIDER_ISSUER=https://127.0.0.1:8443
           OIDC_INTEROP_CLIENT_ID=oidc-test-client
           OIDC_INTEROP_CLIENT_SECRET=ci-only-client-secret
-          OIDC_INTEROP_REDIRECT_URI=http://127.0.0.1:8081/callback
+          OIDC_INTEROP_REDIRECT_URI=https://127.0.0.1:8081/callback
           OIDC_INTEROP_TEST_USERNAME=alice
           OIDC_INTEROP_TEST_PASSWORD=ci-only-password
           OIDC_INTEROP_TEST_CONTROL_SECRET=ci-only-control-secret
-          OIDC_INTEROP_ALLOW_INSECURE_HTTP_FOR_CI=1
+          OIDC_INTEROP_CA_BUNDLE=$RUNNER_TEMP/provider.crt
           EOF
       - name: Generate ephemeral provider keys
         working-directory: openid-connect-server-examples/reference-provider
@@ -61,8 +72,37 @@ jobs:
       - name: Start reference provider
         working-directory: openid-connect-server-examples/reference-provider
         run: php -S 127.0.0.1:8080 -t public public/index.php > provider.log 2>&1 &
+      - name: Start local HTTPS proxy
+        shell: bash
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout "$RUNNER_TEMP/provider.key" -out "$RUNNER_TEMP/provider.crt" -days 1 -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1"
+          TLS_CERT="$RUNNER_TEMP/provider.crt" TLS_KEY="$RUNNER_TEMP/provider.key" node -e '
+            const fs = require("node:fs");
+            const https = require("node:https");
+            const http = require("node:http");
+            https.createServer({key: fs.readFileSync(process.env.TLS_KEY), cert: fs.readFileSync(process.env.TLS_CERT)}, (request, response) => {
+              const upstream = http.request({hostname: "127.0.0.1", port: 8080, path: request.url, method: request.method, headers: request.headers}, upstreamResponse => {
+                response.writeHead(upstreamResponse.statusCode, upstreamResponse.headers);
+                upstreamResponse.pipe(response);
+              });
+              upstream.on("error", error => { response.writeHead(502); response.end(error.message); });
+              request.pipe(upstream);
+            }).listen(8443, "127.0.0.1");
+          ' > "$RUNNER_TEMP/https-proxy.log" 2>&1 &
       - name: Wait for provider
-        run: until curl --fail --silent http://127.0.0.1:8080/health; do sleep 1; done
+        shell: bash
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --cacert "$RUNNER_TEMP/provider.crt" https://127.0.0.1:8443/health; then exit 0; fi
+            sleep 1
+          done
+          echo "Provider did not become healthy within 30 seconds. Provider and HTTPS proxy logs follow:" >&2
+          cat openid-connect-server-examples/reference-provider/provider.log >&2
+          cat "$RUNNER_TEMP/https-proxy.log" >&2
+          exit 1
+      - name: Show provider log on failure
+        if: failure()
+        run: cat openid-connect-server-examples/reference-provider/provider.log
       - name: Run independent live interoperability and security checks
         working-directory: openid-connect-server-examples/interop-client
         run: composer check-provider && composer security-checks
