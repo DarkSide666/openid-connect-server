@@ -72,10 +72,11 @@ logging, and operational key management.
 
 ## Explicitly unsupported in the current profile
 
-The library does not currently provide implicit or hybrid flows, refresh-token issuance, dynamic
-client registration, request objects, PAR, JARM, logout, session management, encrypted ID Tokens,
-`form_post`, or FAPI profiles. Do not advertise or enable these capabilities through host routes or
-metadata unless a separately reviewed implementation adds them.
+The library does not currently provide implicit or hybrid flows, request objects, PAR, JARM, session
+management, encrypted ID Tokens, `form_post`, or FAPI profiles. Optional refresh-token, logout and
+client-registration components are available, but remain disabled by default and require host-owned
+durable storage, policy, routing and delivery adapters. Review the relevant host adapters before
+enabling them in a deployment.
 
 ## Security validation still required before production use
 

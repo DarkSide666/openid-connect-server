@@ -256,7 +256,7 @@ $authorizationServer = new AuthorizationServer(
 $authorizationServer->enableGrantType($oidcGrant, $accessTokenTtl);
 ```
 
-`$applicationRefreshTokenRepository` is required by League's `AuthCodeGrant` constructor, but this OIDC adapter overrides refresh-token issuance and returns no refresh token. The package does not implement refresh-token grant support. The host application's scope repository must recognize `openid` (and any other scopes the application supports), and the relevant client must be allowed to use the authorization-code grant.
+`$applicationRefreshTokenRepository` is required by League's `AuthCodeGrant` constructor. By default this OIDC adapter does not issue refresh tokens. To enable offline access, pass `offlineAccessEnabled: true`, register `OidcRefreshTokenGrant`, configure the host client and scope repositories for `refresh_token` and `offline_access`, and implement durable token storage and family revocation as described in [Optional Protocol Modules](OPTIONAL-PROTOCOL-MODULES.md). The relevant client must be permitted to use the authorization-code and refresh-token grants.
 
 The same `$requestContextProvider` variable is deliberately passed to all three OIDC components. In a request-per-process setup, the surrounding service graph should also be created within that request. Adapt the lifecycle for your framework/worker model as described above.
 

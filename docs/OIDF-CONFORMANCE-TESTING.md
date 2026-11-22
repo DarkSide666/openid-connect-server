@@ -15,9 +15,10 @@ configuration, local HTTPS and deployment instructions.
 
 ## Current library profile
 
-The current profile is Authorization Code flow with `response_type=code`,
+The default profile is Authorization Code flow with `response_type=code`,
 `grant_type=authorization_code`, PKCE `S256`, RS256 ID Tokens, query response mode and UserInfo.
-Refresh tokens, Implicit/Hybrid flows, Dynamic Client Registration, Request Objects, logout, token
+Optional refresh-token, Dynamic Client Registration and logout modules have library tests but are
+not currently exercised by the separate OIDF conformance deployment. Implicit/Hybrid flows, Request Objects, token
 encryption and non-RS256 signing are not implemented by this profile.
 
 Start with OIDC Core Basic OP tests and the applicable Configuration OP tests only after reviewing

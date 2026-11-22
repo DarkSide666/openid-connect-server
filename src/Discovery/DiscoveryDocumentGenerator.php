@@ -32,6 +32,16 @@ final readonly class DiscoveryDocumentGenerator
         if ($this->metadata->userinfoEndpoint !== null) {
             $document['userinfo_endpoint'] = $this->metadata->userinfoEndpoint;
         }
+        if ($this->metadata->endSessionEndpoint !== null) {
+            $document['end_session_endpoint'] = $this->metadata->endSessionEndpoint;
+        }
+        if ($this->metadata->backchannelLogoutSupported) {
+            $document['backchannel_logout_supported'] = true;
+            $document['backchannel_logout_session_supported'] = $this->metadata->backchannelLogoutSessionSupported;
+        }
+        if ($this->metadata->registrationEndpoint !== null) {
+            $document['registration_endpoint'] = $this->metadata->registrationEndpoint;
+        }
 
         return $document;
     }

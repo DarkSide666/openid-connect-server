@@ -22,6 +22,7 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         RefreshTokenRepositoryInterface $refreshTokenRepository,
         DateInterval $authorizationCodeTtl,
         private readonly OidcRequestContextProviderInterface $contextProvider,
+        private readonly bool $offlineAccessEnabled = false,
     ) {
         parent::__construct($authCodeRepository, $refreshTokenRepository, $authorizationCodeTtl);
     }
@@ -38,7 +39,11 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         foreach ($authorizationRequest->getScopes() as $scope) {
             if ($scope->getIdentifier() === 'openid') {
                 $hasOpenIdScope = true;
-                break;
+            }
+            if ($scope->getIdentifier() === 'offline_access' && !$this->offlineAccessEnabled) {
+                $redirectUri = $authorizationRequest->getRedirectUri()
+                    ?? $this->getClientRedirectUri($authorizationRequest->getClient());
+                throw \League\OAuth2\Server\Exception\OAuthServerException::invalidScope('offline_access', $redirectUri);
             }
         }
 
@@ -65,6 +70,17 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         }
 
         $authorizationRequest->setNonce($nonce);
+        $scopes = array_map(static fn ($scope): string => $scope->getIdentifier(), $authorizationRequest->getScopes());
+        if ($this->offlineAccessEnabled && in_array('offline_access', $scopes, true)) {
+            $prompt = $query['prompt'] ?? '';
+            $prompts = is_string($prompt) ? preg_split('/\s+/', trim($prompt), -1, PREG_SPLIT_NO_EMPTY) : false;
+            if (!is_array($prompts) || !in_array('consent', $prompts, true) || in_array('none', $prompts, true)) {
+                throw \League\OAuth2\Server\Exception\OAuthServerException::invalidRequest(
+                    'prompt',
+                    'offline_access requires explicit consent (prompt=consent).',
+                );
+            }
+        }
 
         $maxAge = $query['max_age'] ?? null;
         if ($maxAge !== null) {
@@ -105,9 +121,17 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         }
     }
 
-    /** OIDC v1 deliberately does not issue refresh tokens. */
+    /** Refresh tokens are opt-in and only issued for explicitly consented offline access. */
     protected function issueRefreshToken(AccessTokenEntityInterface $accessToken): ?RefreshTokenEntityInterface
     {
+        if (!$this->offlineAccessEnabled) {
+            return null;
+        }
+        foreach ($accessToken->getScopes() as $scope) {
+            if ($scope->getIdentifier() === 'offline_access') {
+                return parent::issueRefreshToken($accessToken);
+            }
+        }
         return null;
     }
 

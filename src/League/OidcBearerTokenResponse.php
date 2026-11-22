@@ -8,6 +8,7 @@ use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\ResponseTypes\BearerTokenResponse;
 use SensitiveParameter;
 use DarkSide\OpenIdConnectServer\Identity\IdentityResolverInterface;
+use DarkSide\OpenIdConnectServer\Identity\SessionIdentityInterface;
 use DarkSide\OpenIdConnectServer\Token\IdTokenIssuer;
 use DarkSide\OpenIdConnectServer\Transaction\OidcRequestContextProviderInterface;
 
@@ -25,6 +26,9 @@ final class OidcBearerTokenResponse extends BearerTokenResponse
      */
     protected function getExtraParams(#[SensitiveParameter] AccessTokenEntityInterface $accessToken): array
     {
+        if ($this->contextProvider->current()->isRefreshResponse()) {
+            return [];
+        }
         $grantedScopes = [];
         foreach ($accessToken->getScopes() as $scope) {
             $grantedScopes[] = $scope->getIdentifier();
@@ -47,9 +51,10 @@ final class OidcBearerTokenResponse extends BearerTokenResponse
         $clientId = $accessToken->getClient()->getIdentifier();
         $maxAge = $this->contextProvider->current()->consumeRedeemedMaxAge();
         $identity = $this->identityResolver->resolve($userIdentifier, $clientId, $grantedScopes);
+        $sessionId = $identity instanceof SessionIdentityInterface ? $identity->sessionId() : null;
 
         return [
-            'id_token' => $this->idTokenIssuer->issue($clientId, $identity, $nonce, null, $grantedScopes, $maxAge),
+            'id_token' => $this->idTokenIssuer->issue($clientId, $identity, $nonce, null, $grantedScopes, $maxAge, $sessionId),
         ];
     }
 }

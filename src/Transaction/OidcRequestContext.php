@@ -10,6 +10,17 @@ final class OidcRequestContext
     private ?int $pendingMaxAge = null;
     private ?string $redeemedNonce = null;
     private ?int $redeemedMaxAge = null;
+    private bool $refreshResponse = false;
+
+    public function setRefreshResponse(bool $refreshResponse): void
+    {
+        $this->refreshResponse = $refreshResponse;
+    }
+
+    public function isRefreshResponse(): bool
+    {
+        return $this->refreshResponse;
+    }
 
     public function setPendingNonce(string $nonce, ?int $maxAge = null): void
     {
