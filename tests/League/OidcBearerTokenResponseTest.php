@@ -175,4 +175,42 @@ final class OidcBearerTokenResponseTest extends TestCase
         self::assertArrayNotHasKey('id_token', $payload);
         self::assertNull($context->consumeRedeemedNonce());
     }
+
+    public function testRefreshResponsesDoNotAttemptToIssueAnIdToken(): void
+    {
+        $context = new OidcRequestContext();
+        $responseType = new OidcBearerTokenResponse(
+            new IdTokenIssuer('https://issuer.example.test', RsaKeyPair::generate()),
+            new class () implements IdentityResolverInterface {
+                public function resolve(string $userIdentifier, string $clientId, array $grantedScopes): \DarkSide\OpenIdConnectServer\Identity\IdentityInterface
+                {
+                    TestCase::fail('A refresh response must not issue another ID Token.');
+                }
+            },
+            new RequestScopedOidcContextProvider($context),
+        );
+        $openid = $this->createMock(ScopeEntityInterface::class);
+        $openid->method('getIdentifier')->willReturn('openid');
+        $accessToken = $this->createMock(AccessTokenEntityInterface::class);
+        $accessToken->method('getScopes')->willReturn([$openid]);
+        $accessToken->method('getExpiryDateTime')->willReturn(new DateTimeImmutable('+5 minutes'));
+        $accessToken->method('toString')->willReturn('opaque-access-token');
+        $responseType->setAccessToken($accessToken);
+        $responseType->markRefreshResponse();
+
+        $body = '';
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('withStatus')->willReturnSelf();
+        $response->method('withHeader')->willReturnSelf();
+        $stream = $this->createMock(StreamInterface::class);
+        $stream->method('write')->willReturnCallback(static function (string $contents) use (&$body): int {
+            $body = $contents;
+
+            return strlen($contents);
+        });
+        $response->method('getBody')->willReturn($stream);
+
+        $responseType->generateHttpResponse($response);
+        self::assertArrayNotHasKey('id_token', json_decode($body, true, 512, JSON_THROW_ON_ERROR));
+    }
 }

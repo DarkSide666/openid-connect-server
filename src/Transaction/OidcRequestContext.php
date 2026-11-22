@@ -8,8 +8,21 @@ final class OidcRequestContext
 {
     private ?string $pendingNonce = null;
     private ?int $pendingMaxAge = null;
+    private ?string $pendingSessionId = null;
     private ?string $redeemedNonce = null;
     private ?int $redeemedMaxAge = null;
+    private ?string $redeemedSessionId = null;
+    private bool $refreshResponse = false;
+
+    public function setRefreshResponse(bool $refreshResponse): void
+    {
+        $this->refreshResponse = $refreshResponse;
+    }
+
+    public function isRefreshResponse(): bool
+    {
+        return $this->refreshResponse;
+    }
 
     public function setPendingNonce(string $nonce, ?int $maxAge = null): void
     {
@@ -22,6 +35,26 @@ final class OidcRequestContext
 
         $this->pendingNonce = $nonce;
         $this->pendingMaxAge = $maxAge;
+    }
+
+    public function setPendingSessionId(?string $sessionId): void
+    {
+        if ($sessionId !== null && ($sessionId === '' || strlen($sessionId) > 255)) {
+            throw new \InvalidArgumentException('The OIDC session ID must contain 1-255 bytes.');
+        }
+        $this->pendingSessionId = $sessionId;
+    }
+
+    public function pendingSessionId(): ?string
+    {
+        return $this->pendingSessionId;
+    }
+
+    public function consumePendingSessionId(): ?string
+    {
+        $sessionId = $this->pendingSessionId;
+        $this->pendingSessionId = null;
+        return $sessionId;
     }
 
     public function pendingNonce(): ?string
@@ -54,9 +87,10 @@ final class OidcRequestContext
     {
         $this->pendingNonce = null;
         $this->pendingMaxAge = null;
+        $this->pendingSessionId = null;
     }
 
-    public function setRedeemedNonce(string $nonce, ?int $maxAge = null): void
+    public function setRedeemedNonce(string $nonce, ?int $maxAge = null, ?string $sessionId = null): void
     {
         if ($this->redeemedNonce !== null) {
             throw new \LogicException('An OIDC nonce has already been attached to this token response.');
@@ -67,6 +101,7 @@ final class OidcRequestContext
 
         $this->redeemedNonce = $nonce;
         $this->redeemedMaxAge = $maxAge;
+        $this->redeemedSessionId = $sessionId;
     }
 
     public function consumeRedeemedNonce(): ?string
@@ -83,5 +118,12 @@ final class OidcRequestContext
         $this->redeemedMaxAge = null;
 
         return $maxAge;
+    }
+
+    public function consumeRedeemedSessionId(): ?string
+    {
+        $sessionId = $this->redeemedSessionId;
+        $this->redeemedSessionId = null;
+        return $sessionId;
     }
 }

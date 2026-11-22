@@ -28,12 +28,22 @@ final readonly class ProviderMetadata
         public array $responseTypes = ['code'],
         public array $responseModes = ['query'],
         public array $codeChallengeMethods = ['S256'],
+        public ?string $endSessionEndpoint = null,
+        public bool $backchannelLogoutSupported = false,
+        public bool $backchannelLogoutSessionSupported = false,
+        public bool $offlineAccessSupported = false,
+        public ?string $registrationEndpoint = null,
     ) {
         foreach (['issuer' => $issuer, 'authorization_endpoint' => $authorizationEndpoint, 'token_endpoint' => $tokenEndpoint, 'jwks_uri' => $jwksUri] as $name => $url) {
             self::assertHttpsUrl($name, $url, $name === 'issuer');
         }
         if ($userinfoEndpoint !== null) {
             self::assertHttpsUrl('userinfo_endpoint', $userinfoEndpoint);
+        }
+        foreach (['end_session_endpoint' => $endSessionEndpoint, 'registration_endpoint' => $registrationEndpoint] as $name => $url) {
+            if ($url !== null) {
+                self::assertHttpsUrl($name, $url);
+            }
         }
 
         self::assertNonEmptyStringList('scopes', $scopes);
@@ -47,14 +57,27 @@ final readonly class ProviderMetadata
         if (!in_array('openid', $scopes, true)) {
             throw new \InvalidArgumentException('An OpenID Provider must advertise the openid scope.');
         }
-        if ($grantTypes !== ['authorization_code'] || $responseTypes !== ['code']) {
-            throw new \InvalidArgumentException('This library profile supports only the authorization_code grant and code response type.');
+        $supportedGrantTypes = $offlineAccessSupported ? ['authorization_code', 'refresh_token'] : ['authorization_code'];
+        if ($responseTypes !== ['code']) {
+            throw new \InvalidArgumentException('This library profile supports only the code response type.');
+        }
+        if ($grantTypes !== $supportedGrantTypes) {
+            throw new \InvalidArgumentException('This library profile supports only the authorization_code grant, with refresh_token enabled only for offline access.');
         }
         if ($responseModes !== ['query']) {
             throw new \InvalidArgumentException('This library profile supports only the query response mode.');
         }
         if ($codeChallengeMethods !== ['S256']) {
             throw new \InvalidArgumentException('This library profile supports only PKCE S256.');
+        }
+        if ($offlineAccessSupported !== in_array('offline_access', $scopes, true)) {
+            throw new \InvalidArgumentException('Advertise offline_access only when offline access support is enabled.');
+        }
+        if ($backchannelLogoutSessionSupported && !$backchannelLogoutSupported) {
+            throw new \InvalidArgumentException('Back-channel session logout requires back-channel logout support.');
+        }
+        if ($backchannelLogoutSessionSupported && !in_array('sid', $claims, true)) {
+            throw new \InvalidArgumentException('Session logout support requires sid in claims_supported.');
         }
 
         foreach (['iss', 'sub', 'aud', 'exp', 'iat'] as $requiredClaim) {

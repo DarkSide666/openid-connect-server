@@ -55,6 +55,7 @@ final readonly class IdTokenIssuer
         ?DateTimeImmutable $now = null,
         array $grantedScopes = [],
         ?int $maxAge = null,
+        ?string $sessionId = null,
     ): string {
         if ($clientId === '') {
             throw new \InvalidArgumentException('The client ID must not be empty.');
@@ -66,6 +67,9 @@ final readonly class IdTokenIssuer
 
         if ($maxAge !== null && $maxAge < 0) {
             throw new \InvalidArgumentException('The max_age value must not be negative.');
+        }
+        if ($sessionId !== null && ($sessionId === '' || strlen($sessionId) > 255)) {
+            throw new \InvalidArgumentException('The session ID must contain 1-255 bytes.');
         }
 
         $subject = $identity->subject();
@@ -127,6 +131,9 @@ final readonly class IdTokenIssuer
 
         if ($authTime !== null) {
             $builder = $builder->withClaim('auth_time', $authTime->getTimestamp());
+        }
+        if ($sessionId !== null) {
+            $builder = $builder->withClaim('sid', $sessionId);
         }
 
         $claims = $this->scopeClaimFilter->filter($identity->claims(), $grantedScopes);

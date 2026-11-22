@@ -48,7 +48,7 @@ final readonly class OidcAuthCodeRepository implements AuthCodeRepositoryInterfa
         try {
             $this->metadataStore->store(
                 $authCodeEntity->getIdentifier(),
-                new AuthorizationCodeMetadata($nonce, $authCodeEntity->getExpiryDateTime(), $maxAge),
+                new AuthorizationCodeMetadata($nonce, $authCodeEntity->getExpiryDateTime(), $maxAge, $context->consumePendingSessionId()),
             );
         } catch (Throwable $exception) {
             // Never leave a usable OAuth authorization code without its OIDC binding.
@@ -66,7 +66,7 @@ final readonly class OidcAuthCodeRepository implements AuthCodeRepositoryInterfa
             throw new \LogicException('The authorization code has no valid, unconsumed OIDC nonce metadata.');
         }
 
-        $this->contextProvider->current()->setRedeemedNonce($metadata->nonce, $metadata->maxAge);
+        $this->contextProvider->current()->setRedeemedNonce($metadata->nonce, $metadata->maxAge, $metadata->sessionId);
     }
 
     public function isAuthCodeRevoked(string $codeId): bool

@@ -74,9 +74,11 @@ The current implementation is intentionally narrow:
 - Discovery metadata and JWKS generation.
 - UserInfo endpoint handler, using League's resource server to validate Bearer access tokens.
 - Optional `max_age` handling, with re-authentication decisions owned by the host application.
-- No refresh-token issuance by this OIDC grant adapter.
+- Opt-in `offline_access` with League refresh-token support, explicit `prompt=consent`, and single-use rotation/reuse hooks.
+- Opt-in RP-Initiated and Back-Channel Logout protocol components, including Logout Token creation/validation and discovery metadata.
+- Opt-in client-registration service with strict metadata checks and host-controlled access policy and storage.
 
-The library does not implement or advertise implicit flow, password grant, refresh-token grant, Dynamic Client Registration, logout, Request Objects, token encryption or non-RS256 ID Token signing.
+The library does not implement or advertise implicit flow, password grant, Request Objects, token encryption or non-RS256 ID Token signing. New logout, offline-access and registration capabilities remain disabled unless explicitly configured.
 
 ## Main integration boundaries
 
@@ -94,7 +96,7 @@ The library does not provide a database, framework integration, user model, logi
 
 ## Integration guide
 
-Start with **[docs/INTEGRATION-GUIDE.md](docs/INTEGRATION-GUIDE.md)** for the integration boundaries and wiring. Complete runnable host applications and the independent RP interoperability harness live in [darkside/openid-connect-server-examples](https://github.com/darkside666/openid-connect-server-examples).
+Start with **[docs/INTEGRATION-GUIDE.md](docs/INTEGRATION-GUIDE.md)** for the integration boundaries and wiring. See **[docs/OPTIONAL-PROTOCOL-MODULES.md](docs/OPTIONAL-PROTOCOL-MODULES.md)** for logout, offline access and registration extensions. Complete runnable host applications and the independent RP interoperability harness live in [darkside/openid-connect-server-examples](https://github.com/darkside666/openid-connect-server-examples).
 
 Related references:
 

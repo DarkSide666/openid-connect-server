@@ -158,7 +158,38 @@ final class OidcAuthCodeGrantTest extends TestCase
         }
     }
 
-    private function createGrant(bool $confidential = false): OidcAuthCodeGrant
+    public function testOfflineAccessRequiresAnExplicitConsentPrompt(): void
+    {
+        $grant = $this->createGrant(offlineAccessEnabled: true);
+        $this->expectException(OAuthServerException::class);
+        $grant->validateAuthorizationRequest($this->authorizationRequest([
+            'response_type' => 'code',
+            'client_id' => 'client-1',
+            'redirect_uri' => 'https://client.example/callback',
+            'scope' => 'openid offline_access',
+            'code_challenge' => str_repeat('A', 43),
+            'code_challenge_method' => 'S256',
+            'nonce' => 'nonce-123',
+        ]));
+    }
+
+    public function testOfflineAccessAcceptsExplicitConsentPrompt(): void
+    {
+        $grant = $this->createGrant(offlineAccessEnabled: true);
+        $request = $this->authorizationRequest([
+            'response_type' => 'code',
+            'client_id' => 'client-1',
+            'redirect_uri' => 'https://client.example/callback',
+            'scope' => 'openid offline_access',
+            'code_challenge' => str_repeat('A', 43),
+            'code_challenge_method' => 'S256',
+            'nonce' => 'nonce-123',
+            'prompt' => 'login consent',
+        ]);
+        self::assertInstanceOf(OidcAuthorizationRequest::class, $grant->validateAuthorizationRequest($request));
+    }
+
+    private function createGrant(bool $confidential = false, bool $offlineAccessEnabled = false): OidcAuthCodeGrant
     {
         $client = $this->createMock(ClientEntityInterface::class);
         $client->method('getIdentifier')->willReturn('client-1');
@@ -183,6 +214,7 @@ final class OidcAuthCodeGrantTest extends TestCase
             $this->createMock(RefreshTokenRepositoryInterface::class),
             new DateInterval('PT5M'),
             new RequestScopedOidcContextProvider(new OidcRequestContext()),
+            $offlineAccessEnabled,
         );
         $grant->setClientRepository($clientRepository);
         $grant->setScopeRepository($scopeRepository);

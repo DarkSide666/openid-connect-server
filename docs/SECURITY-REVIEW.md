@@ -32,7 +32,8 @@ logging, and operational key management.
 - Standard profile claims are filtered by granted scopes. Application-defined claims remain the
   host resolver's disclosure responsibility.
 - Discovery metadata validates HTTPS endpoint URLs and rejects protocol capabilities outside the
-  current library profile.
+  supported profile. Refresh tokens, logout and client registration are optional capabilities and
+  are advertised only when enabled by the host.
 
 ## Host-application responsibilities
 
@@ -72,10 +73,12 @@ logging, and operational key management.
 
 ## Explicitly unsupported in the current profile
 
-The library does not currently provide implicit or hybrid flows, refresh-token issuance, dynamic
-client registration, request objects, PAR, JARM, logout, session management, encrypted ID Tokens,
-`form_post`, or FAPI profiles. Do not advertise or enable these capabilities through host routes or
-metadata unless a separately reviewed implementation adds them.
+The library does not currently provide implicit or hybrid flows, request objects, PAR, JARM, session
+management, encrypted ID Tokens, `form_post`, or FAPI profiles. Optional refresh-token, logout and
+client-registration components are implemented and covered by automated tests across the library and
+examples repositories, but remain disabled by default. They require host-owned durable storage,
+policy, routing and (for Back-Channel Logout) delivery adapters. Review the relevant host adapters
+before enabling them in a deployment.
 
 ## Security validation still required before production use
 

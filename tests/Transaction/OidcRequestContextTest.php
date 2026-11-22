@@ -30,4 +30,17 @@ final class OidcRequestContextTest extends TestCase
         $this->expectException(\LogicException::class);
         $context->setPendingNonce('second');
     }
+
+    public function testSessionIdMovesWithTheAuthorizationCodeMetadataExactlyOnce(): void
+    {
+        $context = new OidcRequestContext();
+        $context->setPendingSessionId('session-123');
+
+        self::assertSame('session-123', $context->consumePendingSessionId());
+        self::assertNull($context->consumePendingSessionId());
+
+        $context->setRedeemedNonce('nonce-value', null, 'session-123');
+        self::assertSame('session-123', $context->consumeRedeemedSessionId());
+        self::assertNull($context->consumeRedeemedSessionId());
+    }
 }

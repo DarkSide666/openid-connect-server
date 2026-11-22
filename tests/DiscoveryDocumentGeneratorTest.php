@@ -68,6 +68,30 @@ final class DiscoveryDocumentGeneratorTest extends TestCase
         );
     }
 
+    public function testAdvertisesOptInLogoutRefreshAndRegistrationMetadata(): void
+    {
+        $metadata = new ProviderMetadata(
+            issuer: 'https://issuer.example.test',
+            authorizationEndpoint: 'https://issuer.example.test/authorize',
+            tokenEndpoint: 'https://issuer.example.test/token',
+            jwksUri: 'https://issuer.example.test/jwks',
+            scopes: ['openid', 'offline_access'],
+            claims: ['iss', 'sub', 'aud', 'exp', 'iat', 'sid'],
+            grantTypes: ['authorization_code', 'refresh_token'],
+            offlineAccessSupported: true,
+            endSessionEndpoint: 'https://issuer.example.test/logout',
+            backchannelLogoutSupported: true,
+            backchannelLogoutSessionSupported: true,
+            registrationEndpoint: 'https://issuer.example.test/register',
+        );
+        $document = (new DiscoveryDocumentGenerator($metadata))->generate();
+        self::assertSame('https://issuer.example.test/logout', $document['end_session_endpoint']);
+        self::assertTrue($document['backchannel_logout_supported']);
+        self::assertTrue($document['backchannel_logout_session_supported']);
+        self::assertSame(['authorization_code', 'refresh_token'], $document['grant_types_supported']);
+        self::assertSame('https://issuer.example.test/register', $document['registration_endpoint']);
+    }
+
     public function testRejectsIssuerWithQueryCredentialsOrFragment(): void
     {
         foreach ([
