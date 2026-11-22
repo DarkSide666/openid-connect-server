@@ -1,0 +1,68 @@
+name: Interoperability
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  reference-provider:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: openid-connect-server
+      - uses: actions/checkout@v4
+        with:
+          repository: darkside666/openid-connect-server-examples
+          ref: main
+          path: openid-connect-server-examples
+          token: ${{ secrets.EXAMPLES_REPOSITORY_TOKEN || github.token }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json, openssl
+          coverage: none
+      - name: Install reference-provider dependencies against this checkout
+        working-directory: openid-connect-server-examples/reference-provider
+        run: composer install --no-interaction --prefer-dist
+      - name: Install interoperability-client dependencies
+        working-directory: openid-connect-server-examples/interop-client
+        run: composer install --no-interaction --prefer-dist
+      - name: Configure test-only provider and RP
+        shell: bash
+        run: |
+          cat > openid-connect-server-examples/reference-provider/.env <<'EOF'
+          OIDC_REFERENCE_BASE_URL=http://127.0.0.1:8080
+          OIDC_REFERENCE_CLIENT_ID=oidc-test-client
+          OIDC_REFERENCE_CLIENT_SECRET=ci-only-client-secret
+          OIDC_REFERENCE_REDIRECT_URI=http://127.0.0.1:8081/callback
+          OIDC_REFERENCE_TEST_USERNAME=alice
+          OIDC_REFERENCE_TEST_PASSWORD=ci-only-password
+          OIDC_REFERENCE_TEST_CONTROL_SECRET=ci-only-control-secret
+          OIDC_REFERENCE_ACCESS_TOKEN_TTL_SECONDS=2
+          OIDC_REFERENCE_ALLOW_INSECURE_HTTP_FOR_CI=1
+          OIDC_REFERENCE_DATA_DIR=var
+          EOF
+          cat > openid-connect-server-examples/interop-client/.env <<'EOF'
+          OIDC_INTEROP_PROVIDER_ISSUER=http://127.0.0.1:8080
+          OIDC_INTEROP_CLIENT_ID=oidc-test-client
+          OIDC_INTEROP_CLIENT_SECRET=ci-only-client-secret
+          OIDC_INTEROP_REDIRECT_URI=http://127.0.0.1:8081/callback
+          OIDC_INTEROP_TEST_USERNAME=alice
+          OIDC_INTEROP_TEST_PASSWORD=ci-only-password
+          OIDC_INTEROP_TEST_CONTROL_SECRET=ci-only-control-secret
+          OIDC_INTEROP_ALLOW_INSECURE_HTTP_FOR_CI=1
+          EOF
+      - name: Generate ephemeral provider keys
+        working-directory: openid-connect-server-examples/reference-provider
+        run: php bin/setup.php
+      - name: Start reference provider
+        working-directory: openid-connect-server-examples/reference-provider
+        run: php -S 127.0.0.1:8080 -t public public/index.php > provider.log 2>&1 &
+      - name: Wait for provider
+        run: until curl --fail --silent http://127.0.0.1:8080/health; do sleep 1; done
+      - name: Run independent live interoperability and security checks
+        working-directory: openid-connect-server-examples/interop-client
+        run: composer check-provider && composer security-checks

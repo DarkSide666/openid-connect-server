@@ -1,0 +1,42 @@
+{
+  "name": "darkside/openid-connect-server",
+  "description": "Framework-independent OpenID Connect Provider components for PHP, built to integrate with League OAuth2 Server.",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "ext-json": "*",
+    "ext-openssl": "*",
+    "lcobucci/jwt": "^5.6",
+    "league/oauth2-server": "^9.5",
+    "php": "^8.2",
+    "psr/http-message": "^2.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5",
+    "phpstan/phpstan": "^2.1",
+    "friendsofphp/php-cs-fixer": "^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "DarkSide\\OpenIdConnectServer\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "DarkSide\\OpenIdConnectServer\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "analyse": "phpstan analyse",
+    "format:check": "php-cs-fixer fix --dry-run --diff"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
