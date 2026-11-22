@@ -7,7 +7,7 @@ This guide describes how a PHP application wires the existing DarkSide OpenID Co
 The library adds OpenID Connect behavior to an application-owned League OAuth2 Server setup. It expects the host application to provide:
 
 - League client, scope, access-token, authorization-code and refresh-token repositories.
-- A `IdentityResolverInterface` implementation that resolves an authenticated end-user identifier.
+- An `IdentityResolverInterface` implementation that resolves an authenticated end-user identifier.
 - An `AuthorizationCodeMetadataStoreInterface` implementation with atomic one-time consumption.
 - RSA OAuth signing/encryption configuration for League, separate from the OIDC RS256 signing key.
 - HTTPS routes for discovery, authorization, token, JWKS and (if advertised) UserInfo.
