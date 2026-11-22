@@ -26,10 +26,10 @@ jobs:
           coverage: none
       - name: Install reference-provider dependencies against this checkout
         working-directory: openid-connect-server-examples/reference-provider
-        run: composer install --no-interaction --prefer-dist
+        run: composer update --no-interaction --prefer-dist
       - name: Install interoperability-client dependencies
         working-directory: openid-connect-server-examples/interop-client
-        run: composer install --no-interaction --prefer-dist
+        run: composer update --no-interaction --prefer-dist
       - name: Configure test-only provider and RP
         shell: bash
         run: |
