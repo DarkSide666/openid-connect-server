@@ -76,7 +76,11 @@ jobs:
         run: php bin/setup.php
       - name: Start reference provider
         working-directory: openid-connect-server-examples/reference-provider
-        run: php -S 127.0.0.1:8080 -t public public/index.php > provider.log 2>&1 &
+        # The RP's Back-Channel Logout handler fetches discovery and JWKS from
+        # the provider while the provider is waiting for the callback response.
+        # Multiple workers prevent that nested request from deadlocking the
+        # single-worker PHP development server.
+        run: PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:8080 -t public public/index.php > provider.log 2>&1 &
       - name: Start RP application
         working-directory: openid-connect-server-examples/interop-client
         run: php -S 127.0.0.1:8081 -t public public/index.php > rp.log 2>&1 &
