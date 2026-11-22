@@ -3,8 +3,7 @@ name: Interoperability
 on:
   pull_request:
   push:
-    branches: [develop]
-    branches: [main]
+    branches: [develop,main]
   workflow_dispatch:
 
 jobs:
