@@ -18,7 +18,7 @@ final readonly class IdTokenHintValidator
     {
     }
 
-    /** @return array{client_id:string,sub:string,exp:int} */
+    /** @return array{client_id:string,sub:string,exp:int,sid:?string} */
     public function validate(string $jwt, ?DateTimeImmutable $now = null): array
     {
         if ($jwt === '') {
@@ -49,17 +49,20 @@ final readonly class IdTokenHintValidator
         $claims = $token->claims();
         $aud = $claims->get('aud');
         $subject = $claims->get('sub');
+        $sessionId = $claims->get('sid', null);
         $issuedBy = $claims->get('iss');
         $expiresAt = $claims->get('exp');
         $issuedAt = $claims->get('iat');
         $now ??= new DateTimeImmutable();
         if (
             $issuedBy !== $this->issuer || !is_array($aud) || count($aud) !== 1 || !is_string($aud[0] ?? null)
-            || !is_string($subject) || $subject === '' || !$expiresAt instanceof DateTimeImmutable
+            || !is_string($subject) || $subject === ''
+            || ($sessionId !== null && (!is_string($sessionId) || $sessionId === '' || strlen($sessionId) > 255))
+            || !$expiresAt instanceof DateTimeImmutable
             || !$issuedAt instanceof DateTimeImmutable || $issuedAt > $now->modify('+60 seconds')
         ) {
             throw new \InvalidArgumentException('ID Token hint claims are invalid.');
         }
-        return ['client_id' => $aud[0], 'sub' => $subject, 'exp' => $expiresAt->getTimestamp()];
+        return ['client_id' => $aud[0], 'sub' => $subject, 'exp' => $expiresAt->getTimestamp(), 'sid' => $sessionId];
     }
 }

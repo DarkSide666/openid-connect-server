@@ -14,6 +14,7 @@ use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
 use League\OAuth2\Server\ResponseTypes\ResponseTypeInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use DarkSide\OpenIdConnectServer\Transaction\OidcRequestContextProviderInterface;
+use DarkSide\OpenIdConnectServer\Transaction\OidcSessionIdProviderInterface;
 
 final class OidcAuthCodeGrant extends AuthCodeGrant
 {
@@ -23,6 +24,7 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         DateInterval $authorizationCodeTtl,
         private readonly OidcRequestContextProviderInterface $contextProvider,
         private readonly bool $offlineAccessEnabled = false,
+        private readonly ?OidcSessionIdProviderInterface $sessionIdProvider = null,
     ) {
         parent::__construct($authCodeRepository, $refreshTokenRepository, $authorizationCodeTtl);
     }
@@ -113,6 +115,7 @@ final class OidcAuthCodeGrant extends AuthCodeGrant
         $context->setPendingNonce($authorizationRequest->nonce(), $authorizationRequest->maxAge());
 
         try {
+            $context->setPendingSessionId($this->sessionIdProvider?->sessionId($authorizationRequest));
             return parent::completeAuthorizationRequest($authorizationRequest);
         } finally {
             // The repository decorator consumes this while League persists the code.

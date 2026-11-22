@@ -14,6 +14,8 @@ use DarkSide\OpenIdConnectServer\Transaction\OidcRequestContextProviderInterface
 
 final class OidcBearerTokenResponse extends BearerTokenResponse
 {
+    private bool $refreshResponse = false;
+
     public function __construct(
         private readonly IdTokenIssuer $idTokenIssuer,
         private readonly IdentityResolverInterface $identityResolver,
@@ -21,12 +23,17 @@ final class OidcBearerTokenResponse extends BearerTokenResponse
     ) {
     }
 
+    public function markRefreshResponse(): void
+    {
+        $this->refreshResponse = true;
+    }
+
     /**
      * @return array<string, string>
      */
     protected function getExtraParams(#[SensitiveParameter] AccessTokenEntityInterface $accessToken): array
     {
-        if ($this->contextProvider->current()->isRefreshResponse()) {
+        if ($this->refreshResponse || $this->contextProvider->current()->isRefreshResponse()) {
             return [];
         }
         $grantedScopes = [];
@@ -50,8 +57,9 @@ final class OidcBearerTokenResponse extends BearerTokenResponse
 
         $clientId = $accessToken->getClient()->getIdentifier();
         $maxAge = $this->contextProvider->current()->consumeRedeemedMaxAge();
+        $sessionId = $this->contextProvider->current()->consumeRedeemedSessionId();
         $identity = $this->identityResolver->resolve($userIdentifier, $clientId, $grantedScopes);
-        $sessionId = $identity instanceof SessionIdentityInterface ? $identity->sessionId() : null;
+        $sessionId ??= $identity instanceof SessionIdentityInterface ? $identity->sessionId() : null;
 
         return [
             'id_token' => $this->idTokenIssuer->issue($clientId, $identity, $nonce, null, $grantedScopes, $maxAge, $sessionId),

@@ -15,9 +15,10 @@ the consent represented by its approved authorization request.
 Register `OidcRefreshTokenGrant` with the authorization server and configure its lifetime. League's
 repository passed to `OidcRefreshTokenGrant` must implement
 `RotatingRefreshTokenRepositoryInterface`, persist tokens durably and atomically, associate each newly
-issued token with the current family during `beginRotation`/`endRotation`, and revoke the family
-associated with a reused token ID atomically. The handler is called only when the League repository
-confirms that token is revoked.
+issued token with the current family during `beginRotation`/`endRotation`. Its
+`consumeRefreshToken` operation must atomically distinguish a first use from replay. On replay,
+`revokeFamilyForReusedToken` must durably revoke the whole family, including tokens created by a
+concurrent in-flight rotation.
 Do not log presented tokens. The refresh response omits an ID Token; OIDC
 allows one to be omitted from refresh responses.
 
@@ -37,7 +38,10 @@ For Back-Channel Logout, use `LogoutTokenIssuer` and `BackChannelLogoutService`.
 POST `logout_token` as form data to each registered HTTPS endpoint and handle timeouts and failures.
 `LogoutTokenValidator` checks signature, issuer, audience, time bounds, event shape and replay state.
 Its `LogoutTokenReplayStoreInterface` implementation must reserve token IDs atomically until expiry.
-`sid` is included in ID Tokens for identities implementing `SessionIdentityInterface`.
+`sid` is included in ID Tokens when the host supplies it through `OidcSessionIdProviderInterface`
+for an authorization transaction or an identity implementing `SessionIdentityInterface`. Persist
+the session ID with the authorization code; do not look it up later from mutable global session
+state.
 
 Advertise `end_session_endpoint` and Back-Channel Logout support only when the corresponding endpoint
 and host adapters are active. Set `backchannelLogoutSessionSupported` only when session IDs are

@@ -21,7 +21,7 @@ final class RpInitiatedLogoutServiceTest extends TestCase
         $key = RsaKeyPair::generate();
         $issuedAt = new DateTimeImmutable('-2 hours');
         $hint = (new IdTokenIssuer('https://issuer.example.test', $key))
-            ->issue('rp-client', new ArrayIdentity('subject-1'), 'nonce', $issuedAt);
+            ->issue('rp-client', new ArrayIdentity('subject-1'), 'nonce', $issuedAt, ['openid'], null, 'session-1');
         $service = new RpInitiatedLogoutService(new IdTokenHintValidator(
             'https://issuer.example.test',
             [new VerificationKey($key->keyId, $key->publicKeyPem)],
@@ -34,6 +34,7 @@ final class RpInitiatedLogoutServiceTest extends TestCase
         );
         $result = $service->validate($request, ['https://rp.example.test/signed-out']);
         self::assertSame('subject-1', $result['sub']);
+        self::assertSame('session-1', $result['sid']);
         self::assertSame('opaque-state', $result['state']);
 
         $this->expectException(\InvalidArgumentException::class);

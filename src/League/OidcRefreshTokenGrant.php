@@ -39,11 +39,17 @@ final class OidcRefreshTokenGrant extends RefreshTokenGrant
                 $this->rotationRepository->beginRotation($tokenId);
                 $rotationStarted = true;
             }
-            return parent::respondToAccessTokenRequest($request, $responseType, $accessTokenTTL);
-        } catch (OAuthServerException $exception) {
-            if ($tokenId !== null && $this->rotationRepository->isRefreshTokenRevoked($tokenId)) {
-                $this->rotationRepository->revokeFamilyForReusedToken($tokenId);
+            $response = parent::respondToAccessTokenRequest($request, $responseType, $accessTokenTTL);
+            if ($responseType instanceof OidcBearerTokenResponse) {
+                // AuthorizationServer serializes the response after this method returns, so a
+                // request-context flag cleared in finally would be too early.
+                $responseType->markRefreshResponse();
             }
+            return $response;
+        } catch (RefreshTokenReplayException $exception) {
+            $this->rotationRepository->revokeFamilyForReusedToken($exception->refreshTokenId);
+            throw OAuthServerException::invalidRefreshToken('Refresh token replay detected.', $exception);
+        } catch (OAuthServerException $exception) {
             throw $exception;
         } finally {
             if ($rotationStarted) {
@@ -51,6 +57,39 @@ final class OidcRefreshTokenGrant extends RefreshTokenGrant
             }
             $this->contextProvider->current()->setRefreshResponse(false);
         }
+    }
+
+    /** @return array<string, mixed> */
+    protected function validateOldRefreshToken(ServerRequestInterface $request, string $clientId): array
+    {
+        $encrypted = $this->getRequestParameter('refresh_token', $request)
+            ?? throw OAuthServerException::invalidRequest('refresh_token');
+        try {
+            $payload = json_decode($this->decrypt($encrypted), true, 512, JSON_THROW_ON_ERROR);
+        } catch (\Throwable $exception) {
+            throw OAuthServerException::invalidRefreshToken('Cannot decrypt the refresh token', $exception);
+        }
+        if (!is_array($payload)
+            || !is_string($payload['refresh_token_id'] ?? null)
+            || !is_string($payload['client_id'] ?? null)
+            || !is_numeric($payload['expire_time'] ?? null)
+            || !is_array($payload['scopes'] ?? null)) {
+            throw OAuthServerException::invalidRefreshToken('Malformed refresh token.');
+        }
+        if (!hash_equals($clientId, $payload['client_id'])) {
+            throw OAuthServerException::invalidRefreshToken('Token is not linked to client.');
+        }
+        if ((int) $payload['expire_time'] < time()) {
+            throw OAuthServerException::invalidRefreshToken('Token has expired.');
+        }
+        $consumption = $this->rotationRepository->consumeRefreshToken($payload['refresh_token_id']);
+        if ($consumption === RefreshTokenConsumptionResult::REPLAYED) {
+            throw new RefreshTokenReplayException($payload['refresh_token_id']);
+        }
+        if ($consumption !== RefreshTokenConsumptionResult::CONSUMED) {
+            throw OAuthServerException::invalidRefreshToken('Refresh token is invalid, expired, or revoked.');
+        }
+        return $payload;
     }
 
     private function presentedRefreshTokenId(ServerRequestInterface $request): ?string

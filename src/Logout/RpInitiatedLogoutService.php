@@ -12,7 +12,7 @@ final readonly class RpInitiatedLogoutService
 
     /**
      * @param list<string> $registeredPostLogoutRedirectUris
-     * @return array{client_id:?string,sub:?string,post_logout_redirect_uri:?string,state:?string}
+     * @return array{client_id:?string,sub:?string,sid:?string,post_logout_redirect_uri:?string,state:?string}
      */
     public function validate(RpInitiatedLogoutRequest $request, array $registeredPostLogoutRedirectUris): array
     {
@@ -31,6 +31,7 @@ final readonly class RpInitiatedLogoutService
         return [
             'client_id' => $clientId,
             'sub' => $hint['sub'] ?? null,
+            'sid' => $hint['sid'] ?? null,
             'post_logout_redirect_uri' => $redirect,
             'state' => $redirect !== null ? $request->state : null,
         ];
