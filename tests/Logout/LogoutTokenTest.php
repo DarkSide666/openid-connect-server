@@ -45,4 +45,17 @@ final class LogoutTokenTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $validator->validate($jwt, $now->modify('+2 seconds'));
     }
+
+    public function testSerializesNumericDateClaimsAsWholeSeconds(): void
+    {
+        $key = RsaKeyPair::generate();
+        $issuer = new LogoutTokenIssuer('https://issuer.example.test', $key);
+        $jwt = $issuer->issue('rp-client', 'subject-1', null, new DateTimeImmutable('2026-01-02T03:04:05.654321+00:00'));
+        $segments = explode('.', $jwt);
+        self::assertCount(3, $segments);
+        $payload = json_decode(base64_decode(strtr($segments[1], '-_', '+/')), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsInt($payload['iat']);
+        self::assertIsInt($payload['exp']);
+        self::assertSame(1767323045, $payload['iat']);
+    }
 }

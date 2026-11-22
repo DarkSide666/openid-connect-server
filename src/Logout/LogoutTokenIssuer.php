@@ -42,6 +42,15 @@ final readonly class LogoutTokenIssuer
             throw new \LogicException('Logout Token signing configuration is invalid.');
         }
         $now ??= new DateTimeImmutable();
+        // Registered JWT dates should be emitted as whole-second NumericDate
+        // values. Some RPs reject fractional values even though NumericDate
+        // permits them.
+        $issuedAt = $now->setTime(
+            (int) $now->format('H'),
+            (int) $now->format('i'),
+            (int) $now->format('s'),
+            0,
+        );
         $configuration = Configuration::forAsymmetricSigner(
             new Sha256(),
             InMemory::plainText($this->key->privateKeyPem),
@@ -50,8 +59,8 @@ final readonly class LogoutTokenIssuer
         $builder = $configuration->builder()
             ->issuedBy($this->issuer)
             ->permittedFor($clientId)
-            ->issuedAt($now)
-            ->expiresAt($now->add(new DateInterval('PT' . $this->lifetimeSeconds . 'S')))
+            ->issuedAt($issuedAt)
+            ->expiresAt($issuedAt->add(new DateInterval('PT' . $this->lifetimeSeconds . 'S')))
             ->identifiedBy(bin2hex(random_bytes(16)))
             ->withHeader('kid', $this->key->keyId)
             ->withHeader('typ', 'logout+jwt')
