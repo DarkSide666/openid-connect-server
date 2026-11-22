@@ -70,7 +70,7 @@ composer analyse
 composer format:check
 ```
 
-On Windows, call `_set_openssl_conf.cmd` before these commands when the local OpenSSL installation
+On Windows, call `set OPENSSL_CONF=path_to_php\extras\ssl\openssl.cnf` before these commands when the local OpenSSL installation
 requires `OPENSSL_CONF`. The interoperability workflow checks out the examples repository; if it is
 private, configure an `EXAMPLES_REPOSITORY_TOKEN` Actions secret with read access.
 
@@ -80,4 +80,4 @@ Passing the project's automated checks and local independent-RP tests is useful 
 
 ## License
 
-MIT. Confirm the licensing and package metadata before publishing a release.
+MIT
