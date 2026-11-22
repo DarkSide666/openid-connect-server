@@ -18,6 +18,51 @@ The library is a provider component, not a complete identity server. Your applic
 composer require darkside/openid-connect-server
 ```
 
+## Quick example
+
+Create the discovery document and JWKS payloads from the same issuer and RSA key pair used by your
+provider. Load private-key material from a protected secret store; never commit it or place it under
+the public web root.
+
+```php
+<?php
+
+use DarkSide\OpenIdConnectServer\Discovery\DiscoveryDocumentGenerator;
+use DarkSide\OpenIdConnectServer\Discovery\ProviderMetadata;
+use DarkSide\OpenIdConnectServer\Jwks\JwksGenerator;
+use DarkSide\OpenIdConnectServer\Key\SigningKey;
+use DarkSide\OpenIdConnectServer\Token\IdTokenIssuer;
+
+$issuer = 'https://identity.example.test';
+$privateKeyPem = file_get_contents('/run/secrets/oidc-private.pem');
+$publicKeyPem = file_get_contents('/run/secrets/oidc-public.pem');
+
+if (!is_string($privateKeyPem) || !is_string($publicKeyPem)) {
+    throw new RuntimeException('Unable to load the OIDC signing key pair.');
+}
+
+$signingKey = new SigningKey('oidc-rs256-2026-01', $privateKeyPem, $publicKeyPem);
+$idTokenIssuer = new IdTokenIssuer($issuer, $signingKey, 300);
+
+$metadata = new ProviderMetadata(
+    issuer: $issuer,
+    authorizationEndpoint: $issuer . '/authorize',
+    tokenEndpoint: $issuer . '/token',
+    jwksUri: $issuer . '/jwks',
+    userinfoEndpoint: $issuer . '/userinfo',
+    scopes: ['openid', 'profile', 'email'],
+    claims: ['iss', 'sub', 'aud', 'exp', 'iat', 'auth_time', 'nonce', 'name', 'email', 'email_verified'],
+);
+
+$discoveryDocument = (new DiscoveryDocumentGenerator($metadata))->generate();
+$jwks = (new JwksGenerator($signingKey))->generate();
+```
+
+Return `$discoveryDocument` and `$jwks` as JSON from the HTTPS routes named in the metadata. This
+snippet only builds those protocol payloads and the ID Token issuer; it does not configure League,
+authenticate users, persist authorization codes or mount HTTP routes. See the
+[integration guide](docs/INTEGRATION-GUIDE.md) for complete host-application wiring.
+
 ## Supported protocol profile
 
 The current implementation is intentionally narrow:
@@ -70,11 +115,13 @@ composer analyse
 composer format:check
 ```
 
-On Windows, call `set OPENSSL_CONF=path_to_php\extras\ssl\openssl.cnf` before these commands when the local OpenSSL installation
-requires `OPENSSL_CONF`. The interoperability workflow checks out the examples repository; if it is
-private, configure an `EXAMPLES_REPOSITORY_TOKEN` Actions secret with read access.
+On Windows, set `OPENSSL_CONF` to the OpenSSL configuration shipped with your PHP installation before
+these commands if required. In the shared development workspace, the `_set_openssl_conf.cmd` helper
+is in the workspace root, one level above this repository. The interoperability workflow checks out
+the examples repository; if that repository is private, configure an `EXAMPLES_REPOSITORY_TOKEN`
+Actions secret with read access.
 
-The reference provider and independent RP are **test-only** applications in [darkside/openid-connect-server-examples](https://github.com/darkside666/openid-connect-server-examples). The library CI checks them against the current library source; their application-specific test suites are maintained with the examples.
+The reference provider and independent RP are **test-only** applications in [darkside/openid-connect-server-examples](https://github.com/darkside666/openid-connect-server-examples). The library CI selects the matching `main` or `develop` branch through Packagist for the provider dependency and runs live interoperability and security checks. The applications' own test suites are maintained with the examples.
 
 Passing the project's automated checks and local independent-RP tests is useful verification evidence, but it is not a substitute for reviewing the security, persistence, deployment and operational properties of the application that integrates the library. It is not an OIDC conformance or certification claim.
 
