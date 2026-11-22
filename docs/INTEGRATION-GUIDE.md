@@ -256,7 +256,7 @@ $authorizationServer = new AuthorizationServer(
 $authorizationServer->enableGrantType($oidcGrant, $accessTokenTtl);
 ```
 
-`$applicationRefreshTokenRepository` is required by League's `AuthCodeGrant` constructor. By default this OIDC adapter does not issue refresh tokens. To enable offline access, pass `offlineAccessEnabled: true`, register `OidcRefreshTokenGrant`, configure the host client and scope repositories for `refresh_token` and `offline_access`, and implement durable token storage and family revocation as described in [Optional Protocol Modules](OPTIONAL-PROTOCOL-MODULES.md). The relevant client must be permitted to use the authorization-code and refresh-token grants.
+`$applicationRefreshTokenRepository` is required by League's `AuthCodeGrant` constructor. Refresh-token issuance is disabled by default; the adapter supports it when offline access is explicitly enabled. Pass `offlineAccessEnabled: true`, register `OidcRefreshTokenGrant`, configure the host client and scope repositories for `refresh_token` and `offline_access`, and implement durable, atomic token storage and family revocation as described in [Optional Protocol Modules](OPTIONAL-PROTOCOL-MODULES.md). The relevant client must be permitted to use the authorization-code and refresh-token grants.
 
 The same `$requestContextProvider` variable is deliberately passed to all three OIDC components. In a request-per-process setup, the surrounding service graph should also be created within that request. Adapt the lifecycle for your framework/worker model as described above.
 
@@ -282,7 +282,7 @@ $metadata = new ProviderMetadata(
 $discoveryGenerator = new DiscoveryDocumentGenerator($metadata);
 ```
 
-The metadata profile currently permits only the `authorization_code` grant, `code` response type, `query` response mode and PKCE `S256`. `openid` must be included in `scopes`. Required ID Token claims (`iss`, `sub`, `aud`, `exp`, `iat`) must be listed in `claims`.
+By default, the metadata profile permits only the `authorization_code` grant. When offline access is enabled, `ProviderMetadata` permits `refresh_token` only together with the `offline_access` scope and `offlineAccessSupported: true`. The profile uses the `code` response type, `query` response mode and PKCE `S256`. `openid` must be included in `scopes`. Required ID Token claims (`iss`, `sub`, `aud`, `exp`, `iat`) must be listed in `claims`.
 
 If UserInfo is enabled, create it with the same access-token repository and OAuth public key used by the League resource server:
 
